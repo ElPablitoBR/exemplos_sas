@@ -1,0 +1,378 @@
+/* CRIANDO TABELA A PARTIR DE UM ARQUIVO */
+
+proc import datafile="/home/batistapab0/Dados/CARS_csv.csv"
+    out=Tabelas.cars     /*Informa que será criada a tabela cars na lib Tabelas*/
+    dbms=csv             /*Informa que o arquivo é um csv*/
+    replace;
+    getnames=yes;       /* Lê a primeira linha como nome das colunas */
+    guessingrows=max;   /* Faz o SAS analisar o máximo de linhas possível para determinar os tipos */
+run;
+
+/*EXIBIR OS 5 PRIMEIROS REGISTROS APÓS A CRIAÇÃO DA TABELA*/
+
+proc print data=Tabelas.cars (obs=5);
+run;
+
+/*VERIFICAÇÃO DO TIPO DE DADOS */
+proc sql;
+   select name, type, length, format
+   from dictionary.columns
+   where libname='TABELAS' and memname='CARS';
+quit;
+
+
+/*AJUSTE NO TIPO DE DADOS*/
+
+data Tabelas.cars;
+    set Tabelas.cars;
+    format MSRP_num Invoice_num dollar8.;
+    MSRP_num    = input(compress(MSRP, '$,'), best12.);
+    Invoice_num = input(compress(Invoice, '$,'), best12.);
+run;
+
+/* CRIAÇÃO DA ESTRUTURA DE TABELA VAZIA */
+
+proc sql;
+   create table Tabelas.cars_v2
+   (
+       Make       char(20),
+       Model      char(50),
+       Type       char(20),
+       Origin     char(20),
+       DriveTrain char(20),
+       MSRP       num format=dollar10.,
+       Invoice    num format=dollar10.,
+       EngineSize num,
+       Cylinders  num,
+       Horsepower num,
+       MPG_City   num,
+       MPG_Highway num,
+       Weight     num,
+       Wheelbase  num,
+       Length     num
+   );
+quit;
+
+/*
+PARA DATA PODEMOS USAR O EXEMPLO ABAIXO:
+DBIRTHDAY date format=YYMMDD10. *//* Campo de Data */
+
+
+
+/* IMPORTANDO DADOS PARA cars_v2 */
+
+data Tabelas.cars_v2;
+    infile '/home/batistapab0/Dados/CARS_csv.csv' dlm=',' dsd firstobs=2;
+    
+    /* Definindo comprimentos para as variáveis de caractere, se necessário */
+    length Make $20 Model $50 Type $20 Origin $20 DriveTrain $20;
+    
+    /* Lendo os dados. 
+       Note que para as colunas MSRP e Invoice, que no CSV estão entre aspas com "$" e vírgulas, 
+       inicialmente vamos ler como string (aqui com o sufixo _str) para depois converter. */
+    input Make $
+          Model $
+          Type $
+          Origin $
+          DriveTrain $
+          MSRP_str :$20.
+          Invoice_str :$20.
+          EngineSize
+          Cylinders
+          Horsepower
+          MPG_City
+          MPG_Highway
+          Weight
+          Wheelbase
+          Length;
+    
+    /* Convertendo as colunas de valores monetários para numérico, removendo o "$" e as vírgulas */
+    MSRP = input(compress(MSRP_str, '$,'), best12.);
+    Invoice = input(compress(Invoice_str, '$,'), best12.);
+    
+    /*SE QUISESSEMOS USAR O SIMBOLO DO REAL USARÍAMOS O CÓDIGO ABAIXO */
+    /*MSRP = input(compress(MSRP_str, 'R$, '), best12.);
+     Invoice = input(compress(Invoice_str, 'R$, '), best12.);*/
+    
+    /* Removendo as variáveis temporárias */
+    drop MSRP_str Invoice_str;
+run;
+
+/*PARA INSERIR DADOS DE UM NOVO ARQUIVO NA TABELA EXISTENTE */
+
+/* Importando os novos dados para um dataset temporário */
+data novo;
+    infile '/home/batistapab0/Dados/novo_cars.csv' dlm=',' dsd firstobs=2;
+    length Make $20 Model $50 Type $20 Origin $20 DriveTrain $20;
+    input Make $
+          Model $
+          Type $
+          Origin $
+          DriveTrain $
+          MSRP_str :$20.
+          Invoice_str :$20.
+          EngineSize
+          Cylinders
+          Horsepower
+          MPG_City
+          MPG_Highway
+          Weight
+          Wheelbase
+          Length;
+    MSRP = input(compress(MSRP_str, '$,'), best12.);
+    Invoice = input(compress(Invoice_str, '$,'), best12.);
+    drop MSRP_str Invoice_str;
+run;
+
+/* Concatenando os dados existentes com os novos */
+data Tabelas.cars_v2;
+    set Tabelas.cars_v2 novo;
+run;
+
+/*INSERIR DADOS DE FORMA MANUAL NUMA TABELA */
+proc sql;
+   insert into Tabelas.cars
+   set Make='Acura',
+       Model='MDX',
+       Type='SUV',
+       Origin='Asia',
+       DriveTrain='All',
+       MSRP='36945',         /* Número sem aspas */
+       Invoice='33337',      /* Número sem aspas */
+       EngineSize=3.5,     /* Número decimal sem aspas */
+       Cylinders=6,
+       Horsepower=265,
+       MPG_City=17,
+       MPG_Highway=23,
+       Weight=4451,
+       Wheelbase=106,
+       Length=189,
+       MSRP_num=36945,         /* Número sem aspas */
+       Invoice_num=33337;
+quit;
+
+/*OUTRA FORMA DE FAZER INSERT*/
+proc sql;
+   insert into Tabelas.cars (Make, Model, Type, Origin, DriveTrain, MSRP, Invoice, EngineSize, Cylinders, Horsepower, MPG_City, MPG_Highway, Weight, Wheelbase, Length,MSRP_num, Invoice_num)
+   values ('Acura', 'MDX', 'SUV', 'Asia', 'All', '36945', '33337', 3.5, 6, 265, 17, 23, 4451, 106, 189, 36945, 33337);
+quit;
+
+
+/* CRIAR TABELA A PARTIR DE UM SELECT */
+
+proc sql;
+
+CREATE TABLE Tabelas.carros_asiaticos AS 
+SELECT * FROM Tabelas.cars
+WHERE Origin = 'Asia';
+
+run;
+
+/* COMO EXCLUIR TABELAS */
+PROC SQL;
+   DROP TABLE WORK.PETS;
+QUIT;
+
+/* COMO FAZER SELECTS */
+PROC SQL;
+
+SELECT MAKE, COUNT(*) AS Unidades, SUM((MSRP_num - Invoice_num)) as Profit
+ FROM Tabelas.carros_asiaticos
+ GROUP BY MAKE
+ ORDER BY 3 DESC;
+
+;RUN;
+
+/* DATASET */
+
+DATA Tabelas.PETS;
+	INPUT NOME_ANIMAL $20. IDADE_MESES GENERO $ CONTATO_DONO $15. DT_CADASTRO :YYMMDD10.;
+	FORMAT DT_CADASTRO DATE9.; 
+	DATALINES;
+	Toto                 6 M (11)96258-8754 2025-02-05
+	Bella               16 F (11)96258-9654 2025-01-25
+	"Floquinho de neve" 10 M (11)96258-9654 2025-01-25
+;
+RUN;
+
+
+/* KEEP para trazer campos específicos */
+PROC PRINT DATA = Tabelas.carros_asiaticos(KEEP=MAKE MODEL);
+;RUN;
+
+
+PROC PRINT DATA = Tabelas.carros_asiaticos;
+VAR MAKE MODEL;
+;RUN;
+
+
+PROC SORT DATA = Tabelas.carros_asiaticos;
+BY MODEL;
+;RUN;
+
+PROC SORT DATA = Tabelas.carros_asiaticos (where=(Make = 'Honda')) out=newdata;
+BY MODEL;
+;RUN;
+
+
+PROC SORT DATA=Tabelas.carros_asiaticos (WHERE=(Make = 'Honda')) OUT=newdata;
+    BY DESCENDING MODEL Cylinders DESCENDING Invoice;
+RUN;
+
+
+proc sort data=Tabelas.carros_asiaticos (firstobs= 5 obs=8);
+ BY DESCENDING MODEL Cylinders DESCENDING Invoice;
+run;
+
+proc summary data = Tabelas.carros_asiaticos PRINT;
+ 	CLASS Make; 
+;run;
+
+proc summary data= Tabelas.carros_asiaticos MEAN PRINT;
+	CLASS Make;
+	var Invoice_num;
+;run;
+
+proc means data = Tabelas.carros_asiaticos;
+CLASS MAKE;
+;RUN;
+
+proc means data = Tabelas.carros_asiaticos SUM MEAN MAXDEC=1;
+class make;
+var Invoice_num;
+
+;run;
+
+proc delete data=work.temp;
+;run;
+
+data Tabelas.carros1 Tabelas.carros2;
+    set Tabelas.cars;
+    if Cylinders <= 4 then output Tabelas.carros1;
+    else output Tabelas.carros2;
+run;
+
+
+/*APAGANDO DUAS TABELAS*/
+
+proc delete data=Tabelas.carros1 Tabelas.carros2;
+;run;
+
+proc freq data=Tabelas.carros_asiaticos;
+table make;
+;run;
+
+proc freq data = Tabelas.cars;
+table make * Cylinders / nocol norow nofreq;
+;run;
+
+proc contents data = Tabelas.cars;
+;run;
+
+
+proc sql;
+DESCRIBE TABLE Tabelas.cars;
+;run;
+
+
+proc copy in = Tabelas out=work;
+SELECT cars pets;
+;RUN;
+
+proc print data = work.cars;
+title "Lista de Carros";
+;run;
+
+proc summary data = work.cars print;
+	class make;
+	title "Quantidade de carros por fabricante";
+	footnote  "Este é o rodapé";
+;run;
+
+
+
+PROC SQL;
+
+SELECT 
+	MAKE,
+	COUNT(*) AS QTDE
+FROM Tabelas.carros_asiaticos
+group by make
+HAVING COUNT(*) > 15;
+;RUN;
+
+
+PROC SQL;
+
+SELECT 
+	MAKE,
+	SUM(CASE WHEN Origin="Asia" then INVOICE_NUM ELSE 0 END) AS VALOR_LIQUIDO_ASIA,
+	SUM(CASE WHEN Origin="Europe" then INVOICE_NUM ELSE 0 END) AS VALOR_LIQUIDO_EUROPE
+FROM Tabelas.cars
+group by make;
+;QUIT;
+
+
+PROC EXPORT DATA= TABELAS.carros_asiaticos DBMS=XLSX
+OUTFILE='/home/batistapab0/Dataset/carros_asiaticos.xlsx';
+;run;
+
+
+
+proc contents data = TABELAS.carros_asiaticos;
+;run;
+
+
+PROC SQL;
+
+CREATE TABLE Tabelas.Tabela1 AS 
+	SELECT *, 
+	CASE WHEN EU_VENDAS > 10 THEN 1 ELSE 0 END AS TOP_EUROPA
+	FROM Tabelas.video_games
+	WHERE CALCULATED TOP_EUROPA=1;
+;RUN;
+
+
+PROC SQL;
+
+CREATE TABLE Tabelas.Tabela2 AS  
+SELECT *,
+CASE WHEN EU_VENDAS > 10 THEN 1 ELSE 0 END AS TOP_EUROPA,
+CASE WHEN NA_VENDAS > 20 THEN 1 ELSE 0 END AS TOP_AMERICA,
+CASE WHEN CALCULATED TOP_EUROPA=1 AND CALCULATED TOP_AMERICA=1   THEN 1 ELSE 0 END AS TOP_EU_NA
+FROM Tabelas.video_games ;
+;RUN;
+
+
+DATA tabelas.TOP10_2012;
+	SET Tabelas.Rank_universidades(WHERE=(RANK_MUNDIAL <= 10 AND ANO_PESQUISA=2012))
+;RUN;
+
+DATA tabelas.TOP10_2013;
+	SET TABELAS.RANK_UNIVERSIDADES(WHERE=(RANK_MUNDIAL <= 10 AND ANO_PESQUISA =2013));
+;RUN; 
+
+PROC SQL;
+SELECT * FROM TABELAS.TOP10_2012
+UNION ALL
+SELECT * FROM TABELAS.TOP10_2013;
+
+;QUIT;
+
+/* Passo 1: Processamento principal sem o campo POSICAO */
+DATA TABELAS.TABELA3;
+    SET TABELAS.RANK_UNIVERSIDADES;
+    /* Outras transformações podem ser feitas aqui */
+RUN;
+
+/* Passo 2: Adicionar o campo POSICAO no final */
+DATA TABELAS.TABELA3;
+    SET TABELAS.TABELA3;
+    LENGTH POSICAO $10; /* Define o comprimento do campo POSICAO */
+    IF 1 <= RANK_MUNDIAL < 11 THEN POSICAO='1-10';
+    ELSE IF 11 <= RANK_MUNDIAL < 21 THEN POSICAO='11-20';
+    ELSE IF 21 <= RANK_MUNDIAL < 31 THEN POSICAO='21-30';
+    ELSE POSICAO='30 OU MAIS'
+;RUN;
+
+
