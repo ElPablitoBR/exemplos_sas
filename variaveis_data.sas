@@ -41,3 +41,94 @@ RUN;
 %extrair_ultimo_mes(mes_ref=&MES_REF3, data_ini=&DATA_REF_3, data_fim=&DATA_REF_3_FIM, plataforma=SISTEMA);
 %extrair_ultimo_mes(mes_ref=&MES_REF2, data_ini=&DATA_REF_2, data_fim=&DATA_REF_2_FIM, plataforma=SISTEMA);
 %extrair_ultimo_mes(mes_ref=&MES_REF1, data_ini=&DATA_REF1, data_fim=&DATA_REF2, plataforma=SISTEMA);
+
+
+
+
+
+
+/* Definindo o parâmetro ANO_MES para teste */
+%let DATA_REF1 = '01APR2025'd;
+%let DATA_REF2 = '30APR2025'd;
+%let DATA_REF_2 = '01MAR2025'd;
+%let DATA_REF_3 = '01FEB2025'd;
+
+%let ANO_MES = 202504;
+
+proc sql;
+   create table BASE_FRANQUIA_POSPG_&ANO_MES as
+   select 
+      A.ANO_MES,
+      A.DAT_MOVIMENTO format=yymmdd10.,
+      A.DW_NUM_NTC,
+      A.NUM_NTC,
+      coalesce(B.FRANQUIA_MB_PLANO, 0) as FRANQUIA_MB,
+      coalesce(B.FRANQUIA_MB_BONUS, 0) as BONUS_MB,
+      coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0) as EXTRAPLAY_MB,
+      (coalesce(B.FRANQUIA_MB_PLANO, 0) + coalesce(B.FRANQUIA_MB_BONUS, 0) + coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0)) as LIMITE_MB_AJU,
+      coalesce(B.FRANQUIA_MB_PLANO, 0) / 1024 as FRANQUIA_GB,
+      coalesce(B.FRANQUIA_MB_BONUS, 0) / 1024 as FRANQUIA_GB_BONUS,
+      coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0) / 1024 as FRANQUIA_GB_EXTRAPLAY,
+      (coalesce(B.FRANQUIA_MB_PLANO, 0) + coalesce(B.FRANQUIA_MB_BONUS, 0) + coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0)) / 1024 as FRANQUIA_TOTAL
+   from (
+      select distinct
+         max(DAT_MOVIMENTO) as DAT_MOVIMENTO,
+         put(max(DAT_MOVIMENTO), yymmn6.) as ANO_MES,
+         C.DW_NUM_NTC,
+         C.NUM_NTC
+      from CONSUMO_FRANQUIA C
+      inner join CLIENTES_ATIVOS A
+         on C.DW_NUM_NTC = A.DW_NUM_NTC
+         and C.NUM_NTC = A.NUM_NTC
+         and A.IND_TITULARIDADE = C.IND_TITULARIDADE
+         and C.IND_TITULARIDADE = 'T'
+      where 
+         C.DAT_MOVIMENTO BETWEEN &DATA_REF1 AND &DATA_REF2
+         and C.COD_PLATAFORMA = "POSPG"
+      group by C.DW_NUM_NTC, C.NUM_NTC
+   ) A
+   left join CONSUMO_FRANQUIA B
+      on A.DAT_MOVIMENTO = B.DAT_MOVIMENTO
+      and A.NUM_NTC = B.NUM_NTC
+   where 
+      B.COD_PLATAFORMA = "POSPG";
+quit;
+
+proc sql;
+   create table BASE_FRANQUIA_AUTO_&ANO_MES as
+   select 
+      A.ANO_MES,
+      A.DAT_MOVIMENTO format=yymmdd10.,
+      A.DW_NUM_NTC,
+      A.NUM_NTC,
+      coalesce(B.FRANQUIA_MB_PLANO, 0) as FRANQUIA_MB,
+      coalesce(B.FRANQUIA_MB_BONUS, 0) as BONUS_MB,
+      coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0) as EXTRAPLAY_MB,
+      (coalesce(B.FRANQUIA_MB_PLANO, 0) + coalesce(B.FRANQUIA_MB_BONUS, 0)) as LIMITE_MB_AJU,
+      coalesce(B.FRANQUIA_MB_PLANO, 0) / 1024 as FRANQUIA_GB,
+      coalesce(B.FRANQUIA_MB_BONUS, 0) / 1024 as FRANQUIA_GB_BONUS,
+      coalesce(B.FRANQUIA_MB_EXTRAPLAY, 0) / 1024 as FRANQUIA_GB_EXTRAPLAY,
+      (coalesce(B.FRANQUIA_MB_PLANO, 0) + coalesce(B.FRANQUIA_MB_BONUS, 0)) / 1024 as FRANQUIA_TOTAL
+   from (
+      select distinct
+         max(DAT_MOVIMENTO) as DAT_MOVIMENTO,
+         put(max(DAT_MOVIMENTO), yymmn6.) as ANO_MES,
+         C.DW_NUM_NTC,
+         C.NUM_NTC
+      from CONSUMO_FRANQUIA C
+      inner join CLIENTES_ATIVOS A
+         on C.DW_NUM_NTC = A.DW_NUM_NTC
+         and C.NUM_NTC = A.NUM_NTC
+         and A.IND_TITULARIDADE = C.IND_TITULARIDADE
+         and C.IND_TITULARIDADE = 'T'
+      where 
+         C.DAT_MOVIMENTO BETWEEN &DATA_REF1 AND &DATA_REF2
+         and C.COD_PLATAFORMA = "AUTOC"
+      group by C.DW_NUM_NTC, C.NUM_NTC
+   ) A
+   left join CONSUMO_FRANQUIA B
+      on A.DAT_MOVIMENTO = B.DAT_MOVIMENTO
+      and A.NUM_NTC = B.NUM_NTC
+   where 
+      B.COD_PLATAFORMA = "AUTOC";
+quit;
