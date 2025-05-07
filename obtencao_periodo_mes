@@ -1,0 +1,25 @@
+/* Etapa 1: Definir data de referência como texto */
+%let DATA_REF_TXT = 01/03/2025:00:00:00;
+
+data datas_convertidas;
+    /* Converte o texto para datetime SAS */
+    dt_ref = input("&DATA_REF_TXT", anydtdtm.);
+
+    /* Extrai ano e mês no formato YYYYMM */
+    ano = year(datepart(dt_ref));
+    mes = month(datepart(dt_ref));
+    mes_atual = ano*100 + mes;
+
+    /* Calcula mês anterior usando INTNX e formata como YYYYMM */
+    data_mes_anterior = intnx('month', datepart(dt_ref), -1, 'beginning');
+    ano_ant = year(data_mes_anterior);
+    mes_ant = month(data_mes_anterior);
+    mes_anterior = ano_ant*100 + mes_ant;
+
+    format dt_ref datetime20. data_mes_anterior date9.;
+run;
+
+/* Exibir o resultado */
+proc print data=datas_convertidas;
+    var dt_ref mes_atual mes_anterior;
+run;
